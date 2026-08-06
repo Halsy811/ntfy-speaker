@@ -70,7 +70,7 @@ func main() {
 		logger.Info("запуск слушателя ntfy...")
 		err := listener.Start(ctx, msgChan)
 		if err != nil {
-			logger.Panic("Слушатель остановлен: " + err.Error())
+			logger.Panic("слушатель остановлен: " + err.Error())
 		}
 		// Если слушатель упал, мы тоже можем захотеть завершить всю программу
 		cancel()
@@ -87,7 +87,7 @@ func main() {
 
 		// Вариант Б: Получен сигнал завершения от ОС (Ctrl+C)
 		case <-sigChan:
-			logger.Info("Получен сигнал завершения...")
+			logger.Info("Получен сигнал завершения (context canceled)...")
 			cancel()                           // Отменяем контекст, что заставит listener.Start() выйти
 			time.Sleep(500 * time.Millisecond) // Даем горутине время корректно закрыться
 			return                             // Выходим из main, программа завершается
