@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -25,12 +26,12 @@ type NtfyMessageType struct {
 	Time       int64           `json:"time"`
 	Event      string          `json:"event"` // Тип события: "message", "keepalive", "open"
 	Topic      string          `json:"topic"`
-	Message    string          `json:"message"`              // Текст самого уведомления
-	Title      string          `json:"title,omitempty"`      // omitempty означает: если заголовка нет, не включать это поле
-	Priority   int             `json:"priority"`             //
-	Tags       []string        `json:"tags"`                 // Список тегов
-	Click      string          `json:"click"`                // При нажатии
-	Attachment *AttachmentType `json:"attachment,omitempty"` // Ссылка на прикрепленный файл
+	Message    string          `json:"message"`         // Текст уведомления
+	Title      string          `json:"title,omitempty"` // Заголовок
+	Priority   int             `json:"priority"`
+	Tags       []string        `json:"tags"`
+	Click      string          `json:"click"`
+	Attachment *AttachmentType `json:"attachment,omitempty"`
 	Scenario   string          `json:"scenario"`
 }
 
@@ -38,8 +39,7 @@ type NtfyMessageType struct {
 func New(url string) *ListenerType {
 	return &ListenerType{
 		url: url,
-		// ВАЖНО: Для потоковых (streaming) соединений таймаут должен быть 0 (бесконечный),
-		// иначе HTTP-клиент разорвет соединение через 30 секунд по умолчанию.
+		// Для потоковых соединений таймаут должен быть 0 (бесконечный)
 		client: &http.Client{
 			Timeout: 0,
 		},
@@ -52,50 +52,49 @@ func (l *ListenerType) Start(ctx context.Context, msgChan chan<- NtfyMessageType
 		return fmt.Errorf("ошибка создания запроса: %w", err)
 	}
 
-	// Явно указываем, что хотим получать JSON (хорошая практика)
+	// Указываем, что хотим получать JSON
 	req.Header.Set("Accept", "application/json")
 
-	// 2. Выполняем запрос через НАШ кастомный клиент (где Timeout: 0)
+	// Выполняем запрос
 	resp, err := l.client.Do(req)
 	if err != nil {
-		// Если контекст был отменен во время установки соединения, вернем эту ошибку
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		return fmt.Errorf("ошибка выполнения HTTP-запроса: %w", err)
 	}
 
-	// ГАРАНТИРОВАННО закрываем тело ответа при выходе из функции, чтобы не было утечек памяти
+	// Закрываем тело ответа при выходе
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("сервер вернул неожиданный статус: %d %s", resp.StatusCode, resp.Status)
 	}
 
-	// 3. Инициализируем потоковый декодер
+	// Создаем декодер для потокового чтения JSON
 	decoder := json.NewDecoder(resp.Body)
 
-	// 4. Бесконечный цикл чтения
+	// Бесконечный цикл чтения сообщений
 	for {
 		var msg NtfyMessageType
 
-		// Decode блокирует выполнение, пока не придет новый JSON или не закроется соединение
+		// Читаем следующее сообщение
 		if err := decoder.Decode(&msg); err != nil {
-			// Если контекст отменен, возвращаем специальную ошибку контекста
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			// Иначе это разрыв сети или ошибка парсинга
+			// Если сервер закрыл соединение штатно, возвращаем nil
+			if err == io.EOF {
+				return nil
+			}
 			return fmt.Errorf("ошибка декодирования или разрыв соединения: %w", err)
 		}
 
-		// Фильтруем только полезные сообщения, игнорируя keepalive
+		// Обрабатываем только реальные сообщения, игнорируем keepalive
 		if msg.Event == "message" {
-			// Отправляем сообщение в канал.
-			// Используем select, чтобы проверить, не отменили ли контекст во время отправки
 			select {
 			case msgChan <- msg:
-				// Сообщение успешно отправлено в main.go
+				// Сообщение отправлено
 			case <-ctx.Done():
 				return ctx.Err()
 			}

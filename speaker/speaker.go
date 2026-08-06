@@ -3,16 +3,16 @@ package speaker
 import (
 	_ "embed"
 	"fmt"
-	pl "ntfy-speaker/listener"
-	"ntfy-speaker/settings"
 	"os"
 	"path/filepath"
+	"sync"
 
+	pl "ntfy-speaker/listener"
+	"ntfy-speaker/settings"
 	"ntfy-speaker/toast"
 )
 
-// https://icon-icons.com/authors/1104-afshin-t2y
-// https://icon-icons.com/pack/iconly-v23-bulk/2945
+// Встраиваем иконки в бинарник
 //
 //go:embed src/wtf-icon.png
 var embeddedIcon_wtf []byte
@@ -29,97 +29,69 @@ var embeddedIcon_warn []byte
 //go:embed src/warning-icon.png
 var embeddedIcon_err []byte
 
-// Глобальная переменная для хранения пути к извлеченной иконке
+// Пути к извлеченным иконкам
 var tempIconPath_wtf string
 var tempIconPath_gooden string
 var tempIconPath_info string
 var tempIconPath_warn string
 var tempIconPath_err string
 
-// initIcon извлекает картинку во временную папку только один раз
-func initIcon(settings *settings.SettingsType) error {
-	// Если путь уже определен, значит мы уже извлекали файл
-	if tempIconPath_wtf != "" && tempIconPath_gooden != "" && tempIconPath_info != "" && tempIconPath_warn != "" && tempIconPath_err != "" {
+var iconsInitialized bool
+var iconMutex sync.Mutex
+
+// InitIcons извлекает иконки во временную папку (вызывается один раз при старте)
+func InitIcons(settings *settings.SettingsType) error {
+	iconMutex.Lock()
+	defer iconMutex.Unlock()
+
+	if iconsInitialized {
 		return nil
-	} else {
-		tempIconPath_wtf = filepath.Join(settings.TmpFolder, "wtf-icon.png")
-		tempIconPath_gooden = filepath.Join(settings.TmpFolder, "gooden-icon.png")
-		tempIconPath_info = filepath.Join(settings.TmpFolder, "information-icon.png")
-		tempIconPath_warn = filepath.Join(settings.TmpFolder, "Hay-icon.png")
-		tempIconPath_err = filepath.Join(settings.TmpFolder, "warning-icon.png")
+	}
 
-		// Проверяем, существует ли уже файл (чтобы не перезаписывать его лишний раз)
-		if _, err := os.Stat(tempIconPath_wtf); err == nil {
+	// Формируем пути к иконкам
+	tempIconPath_wtf = filepath.Join(settings.TmpFolder, "wtf-icon.png")
+	tempIconPath_gooden = filepath.Join(settings.TmpFolder, "gooden-icon.png")
+	tempIconPath_info = filepath.Join(settings.TmpFolder, "information-icon.png")
+	tempIconPath_warn = filepath.Join(settings.TmpFolder, "Hay-icon.png")
+	tempIconPath_err = filepath.Join(settings.TmpFolder, "warning-icon.png")
 
-		} else {
-			// Записываем встроенные байты в файл
-			err := os.WriteFile(tempIconPath_wtf, embeddedIcon_wtf, 0644)
+	// Извлекаем каждую иконку, если её ещё нет
+	icons := []struct {
+		path string
+		data []byte
+	}{
+		{tempIconPath_wtf, embeddedIcon_wtf},
+		{tempIconPath_gooden, embeddedIcon_gooden},
+		{tempIconPath_info, embeddedIcon_info},
+		{tempIconPath_warn, embeddedIcon_warn},
+		{tempIconPath_err, embeddedIcon_err},
+	}
+
+	for _, icon := range icons {
+		if _, err := os.Stat(icon.path); err != nil {
+			// Файл не существует, создаем его
+			err := os.WriteFile(icon.path, icon.data, 0644)
 			if err != nil {
-				return err
-			}
-		}
-
-		// Проверяем, существует ли уже файл (чтобы не перезаписывать его лишний раз)
-		if _, err := os.Stat(tempIconPath_gooden); err == nil {
-
-		} else {
-			err = os.WriteFile(tempIconPath_gooden, embeddedIcon_gooden, 0644)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Проверяем, существует ли уже файл (чтобы не перезаписывать его лишний раз)
-		if _, err := os.Stat(tempIconPath_info); err == nil {
-
-		} else {
-			err = os.WriteFile(tempIconPath_info, embeddedIcon_info, 0644)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Проверяем, существует ли уже файл (чтобы не перезаписывать его лишний раз)
-		if _, err := os.Stat(tempIconPath_warn); err == nil {
-
-		} else {
-			err = os.WriteFile(tempIconPath_warn, embeddedIcon_warn, 0644)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Проверяем, существует ли уже файл (чтобы не перезаписывать его лишний раз)
-		if _, err := os.Stat(tempIconPath_err); err == nil {
-
-		} else {
-			err = os.WriteFile(tempIconPath_err, embeddedIcon_err, 0644)
-			if err != nil {
-				return err
+				return fmt.Errorf("ошибка записи иконки %s: %w", icon.path, err)
 			}
 		}
 	}
 
+	iconsInitialized = true
 	return nil
 }
 
+// Speak отправляет toast-уведомление
 func Speak(msg pl.NtfyMessageType, settings *settings.SettingsType) error {
-
-	err := initIcon(settings)
-	if err != nil {
-		return fmt.Errorf("ошибка при инициализации иконок push-уведомлений: %w", err)
-	}
-
-	// Кнопки
 	var action []toast.Action
 
 	notification := toast.Notification{
-		AppID:   "NtfySpeaker - " + msg.Topic, // Идентификатор вашего приложения
+		AppID:   "NtfySpeaker - " + msg.Topic,
 		Title:   msg.Title,
 		Message: msg.Message,
 	}
 
-	// При нажатии
+	// Добавляем кнопку с ссылкой, если есть
 	if msg.Click != "" {
 		notification.ActivationArguments = settings.ServerName + ":" + settings.ServerPort + "/" + settings.Topik
 		action = append(action, toast.Action{
@@ -131,7 +103,7 @@ func Speak(msg pl.NtfyMessageType, settings *settings.SettingsType) error {
 		notification.ActivationArguments = settings.ServerName + ":" + settings.ServerPort + "/" + settings.Topik
 	}
 
-	// Icon и Duration ("short" или "long")
+	// Выбираем иконку и длительность в зависимости от приоритета
 	switch msg.Priority {
 	case 0: // Средний приоритет
 		notification.Icon = tempIconPath_info
@@ -140,20 +112,25 @@ func Speak(msg pl.NtfyMessageType, settings *settings.SettingsType) error {
 	case 1: // Низкий приоритет
 		notification.Duration = "short"
 		notification.Icon = tempIconPath_wtf
+
 	case 2: // Низкий приоритет
 		notification.Duration = "short"
 		notification.Icon = tempIconPath_gooden
+
 	case 3: // Средний приоритет
 		notification.Icon = tempIconPath_info
 		notification.Duration = "long"
+
 	case 4: // Высокий приоритет
 		notification.Icon = tempIconPath_warn
 		notification.Scenario = "reminder"
+
 	case 5: // Высокий приоритет
 		notification.Icon = tempIconPath_err
 		notification.Scenario = "reminder"
 	}
 
+	// Добавляем вложение, если есть
 	if msg.Attachment != nil {
 		action = append(action, toast.Action{
 			Type:      "protocol",
@@ -164,10 +141,10 @@ func Speak(msg pl.NtfyMessageType, settings *settings.SettingsType) error {
 
 	notification.Actions = action
 
-	// Отправка
-	err = notification.Push()
+	// Отправляем уведомление
+	err := notification.Push()
 	if err != nil {
-		return fmt.Errorf("ошибка при отправке уведомления в панель уведомлений Windows %w", err)
+		return fmt.Errorf("ошибка при отправке уведомления в панель уведомлений Windows: %w", err)
 	}
 
 	return nil
