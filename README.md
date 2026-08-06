@@ -23,17 +23,15 @@
 
 ---
 **Ссылки:**
-- [Официальный репозиторий](https://github.com/binwiederhier/ntfy)
-- [Примеры отправки сообщений](https://docs.ntfy.sh/publish/)
+- [Официальный репозиторий](https://github.com/binwiederhier/ntfy).
+- [Примеры отправки сообщений](https://docs.ntfy.sh/publish/).
 
 
 ## Применение
 
 Запуск через планировщик заданий Windows с использование VBS:
-- [Пример vbs для запуска с указанием топика](example/starter.vbs) - Скрипт запуска. Принимает параметры `-s <server> -p <port> -t <topikName>`
-- [example.vbs](example/self.host.vbs) - Скрипт запуска. Принимает параметры `-s <server> -p <port>` параметр `-t <topikName>` проставляет сам
-- []
+- [Пример vbs для запуска с указанием топика](example/starter.vbs) - Скрипт запуска. Принимает параметры `-s <server> -p <port> -t <topikName>`.
+- [Пример vbs для запуска с топиком имени ПК](example/self.host.vbs) - Скрипт запуска. Принимает параметры `-s <server> -p <port>` параметр `-t <topikName>` проставляет сам.
+- [Пример задачи планировщика Windows](example/examlpe task scheduler.xml) - XML пример задачи планировщика Windows.
 
-```
 
-```
