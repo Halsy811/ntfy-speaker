@@ -69,11 +69,14 @@ func InitIcons(settings *settings.SettingsType) error {
 
 	for _, icon := range icons {
 		if _, err := os.Stat(icon.path); err != nil {
-			// Файл не существует, создаем его
-			err := os.WriteFile(icon.path, icon.data, 0644)
-			if err != nil {
-				return fmt.Errorf("ошибка записи иконки %s: %w", icon.path, err)
+			if os.IsNotExist(err) {
+				err := os.WriteFile(icon.path, icon.data, 0644)
+				if err != nil {
+					return fmt.Errorf("ошибка записи иконки %s: %w", icon.path, err)
+				}
+				continue
 			}
+			return fmt.Errorf("ошибка проверки иконки %s: %w", icon.path, err)
 		}
 	}
 
@@ -91,43 +94,50 @@ func Speak(msg pl.NtfyMessageType, settings *settings.SettingsType) error {
 		Message: msg.Message,
 	}
 
-	// Добавляем кнопку с ссылкой, если есть
+	defaultActivationArguments := fmt.Sprintf("%s/%s", settings.ServerName, settings.Topik)
+	if settings.ServerPort != "" {
+		defaultActivationArguments = fmt.Sprintf("%s:%s/%s", settings.ServerName, settings.ServerPort, settings.Topik)
+	}
+
 	if msg.Click != "" {
-		notification.ActivationArguments = settings.ServerName + ":" + settings.ServerPort + "/" + settings.Topik
+		notification.ActivationArguments = msg.Click
 		action = append(action, toast.Action{
 			Type:      "protocol",
 			Label:     "Ссылка URL",
 			Arguments: msg.Click,
 		})
 	} else {
-		notification.ActivationArguments = settings.ServerName + ":" + settings.ServerPort + "/" + settings.Topik
+		notification.ActivationArguments = defaultActivationArguments
 	}
+
+	notification.Icon = tempIconPath_info
+	notification.Duration = toast.Short
 
 	// Выбираем иконку и длительность в зависимости от приоритета
 	switch msg.Priority {
 	case 0: // Средний приоритет
 		notification.Icon = tempIconPath_info
-		notification.Duration = "long"
+		notification.Duration = toast.Long
 
 	case 1: // Низкий приоритет
-		notification.Duration = "short"
 		notification.Icon = tempIconPath_wtf
+		notification.Duration = toast.Short
 
 	case 2: // Низкий приоритет
-		notification.Duration = "short"
 		notification.Icon = tempIconPath_gooden
+		notification.Duration = toast.Short
 
 	case 3: // Средний приоритет
 		notification.Icon = tempIconPath_info
-		notification.Duration = "long"
+		notification.Duration = toast.Long
 
 	case 4: // Высокий приоритет
 		notification.Icon = tempIconPath_warn
-		notification.Scenario = "reminder"
+		notification.Scenario = toast.Reminder
 
 	case 5: // Высокий приоритет
 		notification.Icon = tempIconPath_err
-		notification.Scenario = "reminder"
+		notification.Scenario = toast.Reminder
 	}
 
 	// Добавляем вложение, если есть

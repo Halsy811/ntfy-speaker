@@ -22,7 +22,7 @@ var (
 	logFileExtension = ".log"
 )
 
-func (s *SettingsType) New() {
+func (s *SettingsType) New() error {
 	// Парсим аргументы командной строки
 	pflag.StringVarP(&s.ServerName, "server", "s", "http://localhost", "Сервер подключения (http://localhost)")
 	pflag.StringVarP(&s.ServerPort, "port", "p", "80", "Порт подключения")
@@ -39,9 +39,12 @@ func (s *SettingsType) New() {
 
 	// Создаем временную папку для иконок и логов
 	s.TmpFolder = filepath.Join(os.TempDir(), "ntfy")
-	os.MkdirAll(s.TmpFolder, 0755) // Используем 0755 вместо 0644 для директорий
+	if err := os.MkdirAll(s.TmpFolder, 0755); err != nil {
+		return fmt.Errorf("ошибка создания временной папки %s: %w", s.TmpFolder, err)
+	}
 
 	// Формируем путь к лог-файлу
-	srtLogFileName := logFileName + "_" + s.Topik + logFileExtension
-	s.LogFilePath = filepath.Join(s.TmpFolder, srtLogFileName)
+	logFileNameWithTopic := logFileName + "_" + s.Topik + logFileExtension
+	s.LogFilePath = filepath.Join(s.TmpFolder, logFileNameWithTopic)
+	return nil
 }

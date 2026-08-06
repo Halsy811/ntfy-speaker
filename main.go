@@ -21,7 +21,10 @@ import (
 func main() {
 	// Используем cfg вместо settings, чтобы не перекрывать имя пакета
 	cfg := &settings.SettingsType{}
-	cfg.New()
+	if err := cfg.New(); err != nil {
+		fmt.Fprintf(os.Stderr, "Ошибка инициализации настроек: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Настраиваем логирование в консоль
 	encoderConsole := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
@@ -111,7 +114,14 @@ func main() {
 	// Главный цикл обработки сообщений
 	for {
 		select {
-		case msg := <-msgChan:
+		case msg, ok := <-msgChan:
+			if !ok {
+				logger.Info("Канал сообщений закрыт, завершаем приложение")
+				cancel()
+				wg.Wait()
+				logger.Info("Приложение полностью остановлено")
+				return
+			}
 			err := speaker.Speak(msg, cfg)
 			if err != nil {
 				logger.Error("ошибка отправки toast-уведомления", zap.Error(err))
