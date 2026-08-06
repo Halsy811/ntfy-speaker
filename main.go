@@ -33,7 +33,6 @@ func main() {
 		MaxAge:     14,   //days
 		Compress:   true, // disabled by default
 	})
-	// zapcore.AddSync(file)
 
 	core := zapcore.NewTee(
 		zapcore.NewCore(encoderConsole, writeConsole, zap.InfoLevel),
@@ -71,7 +70,7 @@ func main() {
 		logger.Info("запуск слушателя ntfy...")
 		err := listener.Start(ctx, msgChan)
 		if err != nil {
-			logger.Info("Слушатель остановлен с ошибкой: " + err.Error())
+			logger.Panic("Слушатель остановлен: " + err.Error())
 		}
 		// Если слушатель упал, мы тоже можем захотеть завершить всю программу
 		cancel()

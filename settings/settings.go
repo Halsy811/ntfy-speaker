@@ -17,7 +17,10 @@ type SettingsType struct {
 	LogFilePath string `json:"logfilepath"`
 }
 
-const logFileName = "ntfy-speaker.log"
+var (
+	logFileName      = "ntfy-speaker"
+	logFileExtension = ".log"
+)
 
 func (s *SettingsType) New() {
 	pflag.StringVarP(&s.ServerName, "server", "s", "http://localhost", "Сервер подключения (http://localhost)")
@@ -35,5 +38,7 @@ func (s *SettingsType) New() {
 	s.TmpFolder = filepath.Join(os.TempDir(), "ntfy")
 	os.Mkdir(s.TmpFolder, 0644)
 
-	s.LogFilePath = filepath.Join(s.TmpFolder, logFileName)
+	srtLogFileName := logFileName + "_" + s.Topik + logFileExtension
+
+	s.LogFilePath = filepath.Join(s.TmpFolder, srtLogFileName)
 }
