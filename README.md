@@ -1,10 +1,10 @@
-# ntfy_speaker
+# ntfy-speaker
 
-**ntfy_speaker** - простой слушатель ntfy сервера под Windows. Отображает сообщения в панеле уведомлений Windows.
+**ntfy-speaker** - простой слушатель ntfy сервера под Windows. Отображает сообщения в панеле уведомлений Windows.
 
 ## Запуск
 ```shell
-.\ntfy_speaker.exe -s "http://host.ru" -t "Topik" -p 8080 
+.\ntfy-speaker.exe -s "http://host.ru" -t "Topik" -p 8080 
 ```
 
 ## Функционал:
